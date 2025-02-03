@@ -10,6 +10,8 @@ import com.driver.bookMyShow.Repositories.UserRepository;
 import com.driver.bookMyShow.Transformers.TicketTransformer;
 import com.driver.bookMyShow.Transformers.UserTransformer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,6 @@ public class UserService {
     private static final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public String addUser(UserEntryDto userEntryDto) throws UserAlreadyExistsWithEmail{
-        System.out.println(userEntryDto);
         if(userRepository.findByEmailId(userEntryDto.getEmailId()) != null) {
             throw new UserAlreadyExistsWithEmail();
         }
@@ -43,12 +44,13 @@ public class UserService {
         return "User Saved Successfully";
     }
 
-    public List<TicketResponseDto> allTickets(Integer userId) throws UserDoesNotExists{
-        Optional<UserEntity> userOpt = userRepository.findById(userId);
-        if(userOpt.isEmpty()) {
+    public List<TicketResponseDto> allTickets() throws UserDoesNotExists{
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        UserEntity user = userRepository.findByEmailId(username);
+        if(user == null) {
             throw new UserDoesNotExists();
         }
-        UserEntity user = userOpt.get();
         List<Ticket> ticketList = user.getTicketList();
         List<TicketResponseDto> ticketResponseDtos = new ArrayList<>();
         for(Ticket ticket : ticketList) {

@@ -11,11 +11,22 @@ import com.driver.bookMyShow.Models.Ticket;
 import com.driver.bookMyShow.Models.UserEntity;
 import com.driver.bookMyShow.Repositories.*;
 import com.driver.bookMyShow.Transformers.TicketTransformer;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,40 +51,39 @@ public class TicketService {
     @Autowired
     private JavaMailSender mailSender;
 
+    @Autowired
+    private EmailService emailService;
+
+    @Transactional
     public TicketResponseDto ticketBooking(TicketEntryDto ticketEntryDto) throws RequestedSeatAreNotAvailable, UserDoesNotExists, ShowDoesNotExists{
-        // check user present
+
         Optional<Show> showOpt = showRepository.findById(ticketEntryDto.getShowId());
         if(showOpt.isEmpty()) {
             throw new ShowDoesNotExists();
         }
 
-        //check show present
-        Optional<UserEntity> userOpt = userRepository.findById(ticketEntryDto.getUserId());
-        if(userOpt.isEmpty()) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+
+        UserEntity user = userRepository.findByEmailId(username);
+        if(user == null) {
             throw new UserDoesNotExists();
         }
-
-        UserEntity user = userOpt.get();
         Show show = showOpt.get();
 
-        //check requested seat available
         Boolean isSeatAvailable = isSeatAvailable(show.getShowSeatList(), ticketEntryDto.getRequestSeats());
         if(!isSeatAvailable) {
             throw new RequestedSeatAreNotAvailable();
         }
 
-        // count price
         Integer getPriceAndAssignSeats = getPriceAndAssignSeats(show.getShowSeatList(),ticketEntryDto.getRequestSeats());
 
-        // change list to string
         String seats = listToString(ticketEntryDto.getRequestSeats());
 
-        // create ticket entity and set all attribute
         Ticket ticket = new Ticket();
         ticket.setTotalTicketsPrice(getPriceAndAssignSeats);
         ticket.setBookedSeats(seats);
 
-        // setting foreign key variables
         ticket.setUser(user);
         ticket.setShow(show);
 
@@ -84,32 +94,76 @@ public class TicketService {
         userRepository.save(user);
         showRepository.save(show);
 
-        // write mail and send to user Id
-        sendMailToUser(user, show,seats);
+//        sendMailToUser(user, show,seats);
 
+        String mailBody = generateEmailBody(user, show, seats);
+        emailService.sendMailToUser(user.getEmailId(), "Ticket Successfully Booked!", mailBody);
 
-        // build Ticket Response Dto
         return TicketTransformer.returnTicket(show, ticket);
     }
 
-    private void sendMailToUser(UserEntity user, Show show, String seats) {
-        String body = "Dear"+user.getName()+",\n\nI hope this email finds you well. \n" +
-                "I am writing to inform you that your ticket has been successfully booked. \n" +
-                "We are pleased to confirm that your preferred date and time and more details have been secured.\n \n" +
-                "Ticket Details:\n\n" +
-                "Booked seat No's: "+seats+"\n" +
-                "Movie Name: "+show.getMovie().getMovieName()+"\n" +
-                "Date: "+show.getDate()+"\n" +
-                "Time: "+show.getTime()+"\n" +
-                "Location: "+show.getTheater().getAddress()+"\n\n"+
-                "Enjoy the show !!";
+    @Transactional
+    public TicketResponseDto cancelTicket(Integer ticketId){
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setText(body);
-        message.setFrom("khanking001qwerty@gmail.com");
-        message.setTo(user.getEmailId());
-        message.setSubject("Ticket Successfully Booked!");
-        mailSender.send(message);
+        Optional<Ticket> ticketOpt = ticketRepository.findById(ticketId);
+
+        if(ticketOpt.isEmpty()){
+            throw new Error("Ticket does not exist");
+        }
+
+        Ticket ticket = ticketOpt.get();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+
+        UserEntity user = userRepository.findByEmailId(username);
+        boolean ticketExistFlag = false;
+
+        for(Ticket t : user.getTicketList()){
+            if(t.getTicketId().equals(ticketId)){
+                ticketExistFlag = true;
+                break;
+            }
+        }
+
+        if(!ticketExistFlag){
+            throw new Error("Ticket does not exist");
+        }
+
+        user.getTicketList().remove(ticket);
+        userRepository.save(user);
+
+        String bookedSeats = ticket.getBookedSeats().trim();
+        if (bookedSeats.endsWith(",")) {
+            bookedSeats = bookedSeats.substring(0, bookedSeats.length() - 1);
+        }
+        List<String> seats = Arrays.asList(bookedSeats.split(",\\s*"));
+
+        Show show = ticket.getShow();
+
+        for(ShowSeat seat:show.getShowSeatList()){
+            String seatNo = seat.getSeatNo();
+            if(seats.contains(seatNo)){
+                seat.setIsAvailable(Boolean.TRUE);
+            }
+        }
+
+        showRepository.save(show);
+        ticketRepository.deleteById(ticketId);
+
+        return TicketTransformer.returnTicket(show, ticket);
+    }
+
+    private String generateEmailBody(UserEntity user, Show show, String seats) {
+        return "Dear " + user.getName() + ",\n\n" +
+                "Your ticket has been successfully booked!\n\n" +
+                "Ticket Details:\n" +
+                "Seats: " + seats + "\n" +
+                "Movie: " + show.getMovie().getMovieName() + "\n" +
+                "Date: " + show.getDate() + "\n" +
+                "Time: " + show.getTime() + "\n" +
+                "Location: " + show.getTheater().getAddress() + "\n\n" +
+                "Enjoy the show!";
     }
 
     private Boolean isSeatAvailable(List<ShowSeat> showSeatList, List<String> requestSeats) {
@@ -143,4 +197,27 @@ public class TicketService {
         return sb.toString();
     }
 
+    @Scheduled(cron = "0 0 10 * * *")
+    public void sendReminderMail(){
+        List<Ticket> ticket = ticketRepository.findAll();
+
+        for(Ticket t : ticket){
+            Show s = t.getShow();
+
+            Date sqlDate = new Date(System.currentTimeMillis());
+            Timestamp sqlTimestamp = new Timestamp(sqlDate.getTime());
+
+            LocalDateTime givenDateTime = sqlTimestamp.toLocalDateTime();
+
+            LocalTime givenTime = givenDateTime.toLocalTime();
+
+            LocalTime currentTime = LocalTime.now();
+
+            if (currentTime.isBefore(givenTime)) {
+                UserEntity user = t.getUser();
+                String mailBody = generateEmailBody(user, s, t.getBookedSeats());
+                emailService.sendMailToUser(user.getEmailId(), "Ticket Successfully Booked!", mailBody);
+            }
+        }
+    }
 }

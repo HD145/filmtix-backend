@@ -29,10 +29,10 @@ public class UserController {
         }
     }
 
-    @GetMapping("/allTickets/{userId}")
-    public ResponseEntity<List<TicketResponseDto>> allTickets(@PathVariable Integer userId) {
+    @GetMapping("/allTickets")
+    public ResponseEntity<List<TicketResponseDto>> allTickets() {
         try {
-            List<TicketResponseDto> result = userService.allTickets(userId);
+            List<TicketResponseDto> result = userService.allTickets();
             return new ResponseEntity<>(result, HttpStatus.CREATED);
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);

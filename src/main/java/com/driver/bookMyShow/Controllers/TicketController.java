@@ -1,5 +1,6 @@
 package com.driver.bookMyShow.Controllers;
 
+import com.driver.bookMyShow.Dtos.RequestDtos.TicketCancelDto;
 import com.driver.bookMyShow.Dtos.RequestDtos.TicketEntryDto;
 import com.driver.bookMyShow.Dtos.ResponseDtos.TicketResponseDto;
 import com.driver.bookMyShow.Services.TicketService;
@@ -24,6 +25,16 @@ public class TicketController {
             TicketResponseDto result = ticketService.ticketBooking(ticketEntryDto);
             return new ResponseEntity<>(result, HttpStatus.CREATED);
         } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/cancel")
+    public ResponseEntity<TicketResponseDto>cancelTicket(@RequestBody TicketCancelDto ticket){
+        try{
+            TicketResponseDto result = ticketService.cancelTicket(ticket.getTicketId());
+            return new ResponseEntity<>(result, HttpStatus.OK);
+        }catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
         }
     }
