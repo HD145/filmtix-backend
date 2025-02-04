@@ -1,6 +1,7 @@
 package com.driver.bookMyShow.Transformers;
 
 import com.driver.bookMyShow.Dtos.RequestDtos.MovieEntryDto;
+import com.driver.bookMyShow.Dtos.ResponseDtos.MovieResponseDto;
 import com.driver.bookMyShow.Models.Movie;
 
 public class MovieTransformer {
@@ -16,5 +17,18 @@ public class MovieTransformer {
                 .build();
 
         return movie;
+    }
+
+    public static MovieResponseDto movieToMovieDto(Movie movie) {
+        MovieResponseDto movieResponseDto = MovieResponseDto.builder()
+                .movieName(movie.getMovieName())
+                .duration(movie.getDuration())
+                .genre(movie.getGenre())
+                .language(movie.getLanguage())
+                .releaseDate(movie.getReleaseDate())
+                .rating(movie.getRating())
+                .build();
+
+        return movieResponseDto;
     }
 }
