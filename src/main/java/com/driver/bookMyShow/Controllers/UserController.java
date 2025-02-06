@@ -1,6 +1,7 @@
 package com.driver.bookMyShow.Controllers;
 
 import com.driver.bookMyShow.Dtos.RequestDtos.UserEntryDto;
+import com.driver.bookMyShow.Dtos.RequestDtos.UserLoginDto;
 import com.driver.bookMyShow.Dtos.ResponseDtos.TicketResponseDto;
 import com.driver.bookMyShow.Models.Ticket;
 import com.driver.bookMyShow.Services.UserService;
@@ -19,15 +20,26 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/addNew")
-    public ResponseEntity<String> addNewUser(@RequestBody UserEntryDto userEntryDto) {
+    @PostMapping("/signup")
+    public ResponseEntity<String> signupUser(@RequestBody UserEntryDto userEntryDto) {
         try {
-            String result = userService.addUser(userEntryDto);
+            String result = userService.signupUser(userEntryDto);
             return new ResponseEntity<>(result, HttpStatus.CREATED);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<String> loginUser(@RequestBody UserLoginDto userLoginDtoDto) {
+        try {
+            String result = userService.loginUser(userLoginDtoDto);
+            return new ResponseEntity<>(result, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
 
     @GetMapping("/allTickets")
     public ResponseEntity<List<TicketResponseDto>> allTickets() {
