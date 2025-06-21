@@ -24,13 +24,14 @@ public class RedisService {
         }
     }
 
-    public void set(String key, Object obj, Long ttl){
+    public <T> T set(String key, Object obj, Long ttl){
         try {
             ObjectMapper objM = new ObjectMapper();
             String json = objM.writeValueAsString(obj);
             redisTemplate.opsForValue().set(key, json, ttl, TimeUnit.SECONDS);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Error serializing object to JSON", e);
+            return null;
+        } catch (Exception e) {
+            return null;
         }
     }
 }
